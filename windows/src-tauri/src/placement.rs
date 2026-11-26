@@ -75,6 +75,8 @@ pub struct ScreenState {
     pub over_notch: bool,
     /// The notch had sunk below an ordinary window and was put back on top (see platform::keep_on_top).
     pub re_topped: bool,
+    /// The primary mouse button is held down (ends a native window drag, which swallows the mouse-up).
+    pub mouse_down: bool,
     /// Pointer position as a fraction of the notch monitor's work area (for dragging), clamped to 0…1.
     pub fx: f64,
     pub fy: f64,
@@ -218,6 +220,7 @@ pub fn screen_state(app: AppHandle, state: tauri::State<'_, PlacementState>, sty
     let re_topped = app.get_webview_window("notch").map(|w| platform::keep_on_top(&w)).unwrap_or(false);
     Ok(ScreenState {
         re_topped,
+        mouse_down: platform::primary_button_down(),
         pointer_monitor: pointer,
         notch_monitor: p.monitor.clone(),
         fullscreen: platform::fullscreen_app_on(s),

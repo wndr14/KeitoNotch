@@ -34,6 +34,8 @@ export interface ScreenState {
   overNotch: boolean;
   /** The notch had sunk below an ordinary window and was put back on top. */
   reTopped: boolean;
+  /** Primary mouse button held down. */
+  mouseDown: boolean;
   fx: number;
   fy: number;
 }

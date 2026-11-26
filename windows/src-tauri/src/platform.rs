@@ -22,6 +22,23 @@ pub fn idle_seconds() -> u64 {
     0
 }
 
+/// The primary mouse button is down right now (the right one when the buttons are swapped).
+#[cfg(windows)]
+pub fn primary_button_down() -> bool {
+    use windows_sys::Win32::UI::Input::KeyboardAndMouse::{GetAsyncKeyState, VK_LBUTTON, VK_RBUTTON};
+    use windows_sys::Win32::UI::WindowsAndMessaging::{GetSystemMetrics, SM_SWAPBUTTON};
+    // SAFETY: plain input-state queries.
+    unsafe {
+        let key = if GetSystemMetrics(SM_SWAPBUTTON) != 0 { VK_RBUTTON } else { VK_LBUTTON };
+        (GetAsyncKeyState(key as i32) as u16 & 0x8000) != 0
+    }
+}
+
+#[cfg(not(windows))]
+pub fn primary_button_down() -> bool {
+    false
+}
+
 /// Shows a window without activating it (SW_SHOWNOACTIVATE), so the app you're typing in keeps focus.
 #[cfg(windows)]
 pub fn show_without_focus(win: &WebviewWindow) {

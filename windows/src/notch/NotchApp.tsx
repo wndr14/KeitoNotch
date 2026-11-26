@@ -148,7 +148,7 @@ export function NotchApp() {
   const settingsOffered = useRef(false);
   const currentMonitor = useRef("");
   const blurClosedAt = useRef(0);
-  const drag = useRef<{ x: number; y: number; active: boolean; pending: boolean } | null>(null);
+  const drag = useRef<{ x: number; y: number; active: boolean; pending: boolean; native: boolean } | null>(null);
   const modeRef = useRef(mode);
   modeRef.current = mode;
   const tuckedRef = useRef(tucked);
@@ -378,21 +378,71 @@ export function NotchApp() {
     };
   }, [back, openForm, set, requestResume]);
 
-  // Drag the collapsed notch: the edge notch slides along the edge; the island snaps to the nearest spot.
+  /** After a drop: snap to the spot under the pointer (edge: that height; island: the nearest of five). */
+  const settleDrop = (st: { fx: number; fy: number } | null) => {
+    const p = store.prefs;
+    if (st) {
+      if (p.style === "island") savePrefs({ island: snapIsland(st.fx, st.fy) });
+      else savePrefs({ position: Math.min(0.96, Math.max(0.04, st.fy)) });
+    }
+    store.reloadPrefs();
+    setDragPos(null);
+    setDragIsland(null);
+    // Place it again even when the spot didn't change: the window was moved by hand.
+    setDisplayTick((t) => t + 1);
+    // Dragged by the peek card: shrink back into the tab at its new spot (the pointer may be elsewhere by now,
+    // so no mouseleave would come to close it).
+    if (modeRef.current === "peek") {
+      setGrown(false);
+      window.clearTimeout(shrinkTimer.current);
+      shrinkTimer.current = window.setTimeout(() => setMode((m) => (m === "peek" ? "collapsed" : m)), MORPH_MS);
+    }
+  };
+
+  /** A native drag swallows the mouse-up: watch the button until it's released, then snap. */
+  const awaitNativeDrop = async (d: NonNullable<typeof drag.current>) => {
+    for (let i = 0; i < 600; i++) {
+      const p = store.prefs;
+      const st = await native.screenState(p.style, p.edge, p.island).catch(() => null);
+      if (drag.current !== d) return;
+      if (st?.mouseDown) {
+        await new Promise((r) => window.setTimeout(r, 100));
+        continue;
+      }
+      drag.current = null;
+      settleDrop(st);
+      return;
+    }
+    drag.current = null;
+    settleDrop(null);
+  };
+
+  // Drag the notch by its tab or peek card. Windows moves the window with the pointer (like a title bar); on
+  // release it snaps into place. Before 26-11 the window stayed put and only jumped once the pointer crossed a
+  // third of the screen, which felt like "dragging doesn't work". That jumping is kept as the fallback.
   const dragHandlers: DragHandlers = {
     onPointerDown(e) {
       if (e.button !== 0) return;
       window.clearTimeout(hoverTimer.current);
-      drag.current = { x: e.screenX, y: e.screenY, active: false, pending: false };
+      drag.current = { x: e.screenX, y: e.screenY, active: false, pending: false, native: false };
     },
     onPointerMove(e) {
       const d = drag.current;
-      if (!d) return;
+      if (!d || d.native) return;
       if (!d.active) {
         if (Math.hypot(e.screenX - d.x, e.screenY - d.y) < 5) return;
-        // Capture only once it's a drag, so a plain click still reaches the ring button.
         d.active = true;
-        e.currentTarget.setPointerCapture(e.pointerId);
+        d.native = true;
+        const target = e.currentTarget;
+        const pointerId = e.pointerId;
+        void getCurrentWindow().startDragging()
+          .then(() => awaitNativeDrop(d))
+          .catch(() => {
+            // No native drag: fall back to jumping between spots while the pointer moves.
+            d.native = false;
+            if (drag.current === d) target.setPointerCapture(pointerId);
+          });
+        return;
       }
       if (d.pending) return;
       d.pending = true;
@@ -406,21 +456,14 @@ export function NotchApp() {
     },
     onPointerUp() {
       const d = drag.current;
+      // A native drag ends in awaitNativeDrop (Windows usually eats this mouse-up anyway).
+      if (d?.native) return;
       drag.current = null;
       if (!d?.active) return;
       swallowNextClick();
       if (dragPos !== null) savePrefs({ position: dragPos });
       if (dragIsland !== null) savePrefs({ island: dragIsland });
-      store.reloadPrefs();
-      setDragPos(null);
-      setDragIsland(null);
-      // Dragged by the peek card: shrink back to the tab at its new spot (the pointer may be elsewhere by now,
-      // so no mouseleave would come to close it).
-      if (modeRef.current === "peek") {
-        setGrown(false);
-        window.clearTimeout(shrinkTimer.current);
-        shrinkTimer.current = window.setTimeout(() => setMode((m) => (m === "peek" ? "collapsed" : m)), MORPH_MS);
-      }
+      settleDrop(null);
     },
   };
 
