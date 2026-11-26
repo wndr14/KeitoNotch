@@ -711,7 +711,11 @@ function FieldBox({ title, trailing, z, children }: { title: string; trailing?: 
 
 function Dropdown({ sections, highlight, onPick }: { sections: DropSection[]; highlight: number; onPick: (it: DropItem) => void }) {
   const hlRef = useRef<HTMLDivElement>(null);
-  useEffect(() => hlRef.current?.scrollIntoView({ block: "nearest" }), [highlight]);
+  // Braces matter: scrollIntoView returns a Promise in current WebView2, and an arrow without them would hand
+  // it to React as the clean-up ("n is not a function", the whole notch UI gone; backlog S13).
+  useEffect(() => {
+    hlRef.current?.scrollIntoView({ block: "nearest" });
+  }, [highlight]);
   let i = -1;
   return (
     // mousedown, not click: picking must happen before the input loses focus (which closes the list).
