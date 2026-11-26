@@ -24,13 +24,34 @@ Everything from the Mac app, except Apple Calendar (Windows uses Google Calendar
 | Keychain | Windows Credential Manager (service `KeitoNotch`) |
 | Sparkle updates | Tauri updater: daily check, optional automatic install, Settings → General → Check for updates |
 
-Keys: `N` new entry, `S` stop / resume last, `C` from calendar, `Esc` back, `Ctrl+Enter` save.
+Keys: `N` new entry, `S` stop / resume last, `C` from calendar, `Esc` back, `Ctrl+Enter` save,
+`Ctrl+V` in the day view with a Jira link or key (`CSD-1234`) = new entry for that ticket.
+
+### Jira tickets pick the project (Windows only for now)
+
+Picking a ticket in the entry form (or pasting one) also fills in where it books (`src/lib/ticketRules.ts`):
+
+1. **The same ticket was logged before** → the same project and task.
+2. **`CSD-…` always books on the service-desk project** (name contains "Service Desk"; with several, the one
+   whose client is "Customer support"), even over a project already in the form. The task there is the
+   customer: it's taken from the ticket's Jira Service Management *Organizations* field when exactly one task
+   matches; otherwise the form asks for the task instead of reusing the last one (that's another customer).
+3. **Another ticket with the same prefix was logged before** → that project, unless you picked one yourself.
+
+Fixed prefixes live in `FIXED_PREFIXES`. The reason shows next to the ticket in the form.
+
+### When something crashes
+
+Each window sits in an error boundary (`src/Recover.tsx`): a crash restarts that window's UI (the notch
+returns to its tab) instead of leaving an empty, invisible window. Crashes and unhandled errors are written to
+`%LOCALAPPDATA%\ai.keito.notch\logs\problems.log` (error, stack and component stack; no Keito or Jira data).
 
 ## Layout
 
 ```
 src/lib/        app logic (ported 1:1 from the Swift services; no UI)
   keito.ts jira.ts google.ts matcher.ts duration.ts dates.ts store.ts prefs.ts native.ts
+  ticketRules.ts (ticket → project/task) problems.ts (problem log)
 src/notch/      notch window: NotchApp (tab, peek, controller), DayView, EntryForm, CalendarView
 src/toast/      toast window
 src/settings/   settings window

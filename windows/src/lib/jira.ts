@@ -28,6 +28,23 @@ interface RawIssue {
 
 const toIssue = (r: RawIssue): JiraIssue => ({ key: r.key, summary: r.fields.summary ?? "", status: r.fields.status?.name });
 
+interface RawField {
+  id: string;
+  schema?: { custom?: string };
+}
+
+/** Jira Service Management's "Organizations" field. */
+export const ORG_FIELD_TYPE = "com.atlassian.servicedesk:sd-customer-organizations";
+const orgFieldCache = new Map<string, Promise<string | null>>();
+
+/** Names from the Organizations field value: [{ id, name }, …]. */
+export function organizationNames(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((o) => (o && typeof o === "object" && typeof (o as { name?: unknown }).name === "string" ? (o as { name: string }).name.trim() : ""))
+    .filter(Boolean);
+}
+
 export class JiraClient {
   constructor(private creds: Credentials) {}
 
@@ -74,6 +91,30 @@ export class JiraClient {
 
   async issue(key: string): Promise<JiraIssue> {
     return toIssue((await this.get(`/rest/api/3/issue/${key}`, { fields: "summary,status" })) as RawIssue);
+  }
+
+  /**
+   * The customer organisations on a Jira Service Management ticket (CSD: the customer you work for).
+   * The field id differs per site, so it's looked up once by its type. Empty when there is none.
+   */
+  async organizations(key: string): Promise<string[]> {
+    const field = await this.organizationField();
+    if (!field) return [];
+    const r = (await this.get(`/rest/api/3/issue/${key}`, { fields: field })) as { fields?: Record<string, unknown> };
+    return organizationNames(r.fields?.[field]);
+  }
+
+  private organizationField(): Promise<string | null> {
+    const cacheKey = this.creds.jiraHost;
+    let found = orgFieldCache.get(cacheKey);
+    if (!found) {
+      found = (this.get("/rest/api/3/field", {}) as Promise<RawField[]>)
+        .then((fields) => fields.find((f) => f.schema?.custom === ORG_FIELD_TYPE)?.id ?? null);
+      // A failed lookup is retried next time, not remembered.
+      found.catch(() => orgFieldCache.delete(cacheKey));
+      orgFieldCache.set(cacheKey, found);
+    }
+    return found;
   }
 
   private async jql(jql: string, limit: number): Promise<JiraIssue[]> {

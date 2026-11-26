@@ -13,6 +13,7 @@ import { installUpdate, startDailyChecks } from "../lib/updates";
 import { dayKey } from "../lib/dates";
 import * as fmt from "../lib/duration";
 import type { CalendarEvent, TimeEntry } from "../lib/models";
+import { keyFromLink, looksLikeKey } from "../lib/jira";
 import { DayRing, ClientTask, ProjectDot, Spinner, TicketChip } from "./parts";
 import { Play, Plus, Stop } from "../icons";
 import { DayView } from "./DayView";
@@ -26,13 +27,15 @@ export interface FormSeed {
   date: Date;
   editing?: TimeEntry;
   event?: CalendarEvent;
+  /** A pasted Jira key: the form links it (and picks the project for it). */
+  ticket?: string;
 }
 
 export interface Nav {
   mode: Mode;
   set(mode: Mode): void;
   back(): void;
-  openForm(opts?: { date?: Date; editing?: TimeEntry; event?: CalendarEvent }): void;
+  openForm(opts?: { date?: Date; editing?: TimeEntry; event?: CalendarEvent; ticket?: string }): void;
   /** Resume a row: today's continue directly; other days ask first. */
   requestResume(entry: TimeEntry): void;
   restartPrompt: TimeEntry | null;
@@ -92,6 +95,13 @@ export function snapIsland(fx: number, fy: number): IslandPos {
   return fx < 1 / 3 ? "topLeft" : fx > 2 / 3 ? "topRight" : "top";
 }
 
+/** A Jira key in pasted text: a ticket link, or just the key ("CSD-1234"). */
+export function ticketKeyIn(text: string): string | null {
+  const t = text.trim();
+  if (!t || t.length > 2000) return null;
+  return keyFromLink(t) ?? (looksLikeKey(t) ? t.toUpperCase() : null);
+}
+
 const isTyping = (t: EventTarget | null) =>
   t instanceof HTMLElement && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable);
 
@@ -143,12 +153,13 @@ export function NotchApp() {
     if (m === "collapsed") setRestartPrompt(null);
   }, []);
 
-  const openForm = useCallback((opts: { date?: Date; editing?: TimeEntry; event?: CalendarEvent } = {}) => {
+  const openForm = useCallback((opts: { date?: Date; editing?: TimeEntry; event?: CalendarEvent; ticket?: string } = {}) => {
     setForm((f) => ({
       key: f.key + 1,
       date: opts.event ? new Date(opts.event.start) : opts.date ?? store.selectedDay,
       editing: opts.editing,
       event: opts.event,
+      ticket: opts.ticket,
     }));
     set("form");
   }, [set]);
@@ -339,8 +350,20 @@ export function NotchApp() {
       else return;
       e.preventDefault();
     };
+    // Ctrl+V with a Jira link or key in the day view: a new entry for that ticket.
+    const onPaste = (e: ClipboardEvent) => {
+      if (modeRef.current !== "day" || isTyping(e.target)) return;
+      const key = ticketKeyIn(e.clipboardData?.getData("text") ?? "");
+      if (!key) return;
+      e.preventDefault();
+      openForm({ date: store.selectedDay, ticket: key });
+    };
     document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
+    document.addEventListener("paste", onPaste);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("paste", onPaste);
+    };
   }, [back, openForm, set, requestResume]);
 
   // Drag the collapsed notch: the edge notch slides along the edge; the island snaps to the nearest spot.

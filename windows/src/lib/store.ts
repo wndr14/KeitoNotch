@@ -6,6 +6,7 @@ import { KeitoClient, friendlyError } from "./keito";
 import { JiraClient } from "./jira";
 import { CalendarProblem, GoogleAuth, GoogleCalendarClient, NotSignedIn, dedupeKey } from "./google";
 import { matchEvent, type Match } from "./matcher";
+import { suggestForTicket, type TicketSuggestion } from "./ticketRules";
 import { idleStep } from "./idle";
 import { native } from "./native";
 import { hasGoogleClient, hasJira, hasKeito, loadCredentials, loadPrefs, savePrefs, type Credentials, type Favorite, type Prefs } from "./prefs";
@@ -751,6 +752,32 @@ export class AppStore {
 
   match(ev: CalendarEvent): Match {
     return matchEvent(ev, this.projects, [...this.today, ...this.recent, ...this.matchHistory]);
+  }
+
+  // MARK: Jira tickets → project
+
+  /** Loads the last 90 days of entries (at most hourly), so a ticket can follow where it was logged before. */
+  prepareTicketHistory() {
+    void this.loadMatchHistory();
+  }
+
+  /** Where a ticket books: CSD → Service Desk, otherwise where this ticket or its prefix went before. */
+  ticketSuggestion(key: string): TicketSuggestion | undefined {
+    const seen = new Set<string>();
+    const history = [...this.today, ...this.weekEntries, ...this.recent, ...this.matchHistory]
+      .filter((e) => !seen.has(e.id) && !!seen.add(e.id))
+      .sort((a, b) => (b.spent_date ?? "").localeCompare(a.spent_date ?? "") || (b.updated_at ?? "").localeCompare(a.updated_at ?? ""));
+    return suggestForTicket(key, this.projects, history);
+  }
+
+  /** The ticket's customer organisations (Jira Service Management); empty on any problem, it's only a hint. */
+  async ticketOrganizations(key: string): Promise<string[]> {
+    if (!this.hasJira) return [];
+    try {
+      return await this.jira.organizations(key);
+    } catch {
+      return [];
+    }
   }
 
   // MARK: Idle

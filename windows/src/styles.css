@@ -383,6 +383,7 @@ button.chip:hover { text-decoration: underline; }
 .field-label { display: flex; justify-content: space-between; font-size: 11px; font-weight: 600; color: var(--muted); }
 .field-label > :first-child { text-transform: uppercase; letter-spacing: 0.6px; }
 .field-label > :last-child { font-weight: 500; }
+.field-label > :last-child:not(:first-child) { min-width: 0; margin-left: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .input {
   height: 36px;
   padding: 0 11px;
