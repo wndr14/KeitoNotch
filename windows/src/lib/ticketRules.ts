@@ -1,6 +1,28 @@
 // Which Keito project (and task) a Jira ticket books on. Pure logic, no network: the form calls it
 // when you pick a ticket, and once more when the ticket's Jira organisation is known.
-import { projectIdOf, taskIdOf, type Project, type TaskItem, type TimeEntry } from "./models";
+import { projectIdOf, taskIdOf, type JiraIssue, type Project, type TaskItem, type TimeEntry } from "./models";
+
+const KEY = /^[A-Za-z][A-Za-z0-9_]+-\d+$/;
+
+/**
+ * Tickets you logged time on, newest first, each once: the quickest pick in the ticket field. The title comes
+ * from the entry's link ("CSD-12 Printer offline" → "Printer offline"). `history` is newest first.
+ */
+export function recentTicketsOf(history: TimeEntry[], limit: number): JiraIssue[] {
+  const out: JiraIssue[] = [];
+  const seen = new Set<string>();
+  for (const e of history) {
+    const ref = e.external_reference;
+    const key = ref?.id?.toUpperCase();
+    if (!key || !KEY.test(key) || seen.has(key)) continue;
+    seen.add(key);
+    const name = ref?.display_name?.trim() ?? "";
+    const summary = name.toUpperCase().startsWith(key) ? name.slice(key.length).replace(/^[\s:–-]+/, "") : name;
+    out.push({ key, summary });
+    if (out.length >= limit) break;
+  }
+  return out;
+}
 
 /** Ticket prefixes that always book on one project, found by name. CSD = the service-desk Jira project. */
 export const FIXED_PREFIXES: { prefix: string; project: RegExp; client?: RegExp }[] = [

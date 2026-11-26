@@ -29,6 +29,8 @@ Keys: `N` new entry, `S` stop / resume last, `C` from calendar, `Esc` back, `Ctr
 
 ### Jira tickets pick the project (Windows only for now)
 
+With Jira set up, the ticket field is the first field of a new entry and has the cursor: its list shows your
+open tickets ("Assigned to me") and the tickets you logged time on lately ("Recently logged"), then search.
 Picking a ticket in the entry form (or pasting one) also fills in where it books (`src/lib/ticketRules.ts`):
 
 1. **The same ticket was logged before** → the same project and task.

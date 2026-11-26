@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fixedProject, suggestForTicket, taskForOrganization } from "./ticketRules";
+import { fixedProject, recentTicketsOf, suggestForTicket, taskForOrganization } from "./ticketRules";
 import type { Project, TimeEntry } from "./models";
 
 const serviceDesk: Project = { id: "sd", name: "CS - Service Desk", client: { id: "c1", name: "Customer support" } };
@@ -94,5 +94,28 @@ describe("taskForOrganization: the customer task in Service Desk", () => {
   });
   it("tries the next organisation when the first has no match", () => {
     expect(taskForOrganization(["Unknown", "Globex"], tasks)?.id).toBe("2");
+  });
+});
+
+describe("recentTicketsOf: the tickets you logged lately", () => {
+  const e = (id: string, ref?: { id: string; display_name?: string }): TimeEntry => ({ id, external_reference: ref ?? null });
+  it("newest first, each once, title without the key, non-Jira links skipped", () => {
+    const history = [
+      e("1", { id: "CSD-12", display_name: "CSD-12 Printer offline" }),
+      e("2"),
+      e("3", { id: "csd-12", display_name: "CSD-12 Printer offline" }),
+      e("4", { id: "https://example.com/x" }),
+      e("5", { id: "MOS-3", display_name: "MOS-3: Release notes" }),
+      e("6", { id: "ABC-1", display_name: "Plain title" }),
+    ];
+    expect(recentTicketsOf(history, 5)).toEqual([
+      { key: "CSD-12", summary: "Printer offline" },
+      { key: "MOS-3", summary: "Release notes" },
+      { key: "ABC-1", summary: "Plain title" },
+    ]);
+  });
+  it("stops at the limit", () => {
+    const history = ["AB-1", "AB-2", "AB-3"].map((k, i) => e(String(i), { id: k }));
+    expect(recentTicketsOf(history, 2).map((t) => t.key)).toEqual(["AB-1", "AB-2"]);
   });
 });
