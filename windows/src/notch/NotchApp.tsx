@@ -406,6 +406,13 @@ export function NotchApp() {
       store.reloadPrefs();
       setDragPos(null);
       setDragIsland(null);
+      // Dragged by the peek card: shrink back to the tab at its new spot (the pointer may be elsewhere by now,
+      // so no mouseleave would come to close it).
+      if (modeRef.current === "peek") {
+        setGrown(false);
+        window.clearTimeout(shrinkTimer.current);
+        shrinkTimer.current = window.setTimeout(() => setMode((m) => (m === "peek" ? "collapsed" : m)), MORPH_MS);
+      }
     },
   };
 
@@ -423,7 +430,8 @@ export function NotchApp() {
   };
   const onLeave = () => {
     window.clearTimeout(hoverTimer.current);
-    if (mode !== "peek") return;
+    // Mid-drag the window jumps to the next spot and leaves the pointer behind: not a real "leave".
+    if (mode !== "peek" || drag.current?.active) return;
     // Shrink the card back into the tab first; the window follows when that's done, so it never jumps.
     setGrown(false);
     window.clearTimeout(shrinkTimer.current);
@@ -451,7 +459,7 @@ export function NotchApp() {
       )}
       {morphing && mode === "peek" && (
         <div className={`morph-layer ${grown ? "" : "faded"}`} style={layer(peekSize)}>
-          <Peek nav={nav} />
+          <Peek nav={nav} drag={dragHandlers} />
         </div>
       )}
       {mode === "day" && <DayView nav={nav} />}
@@ -533,12 +541,14 @@ function Tab({ nav, island, drag, quiet = false }: { nav: Nav; island: boolean; 
   );
 }
 
-function Peek({ nav }: { nav: Nav }) {
+/** The card on hover. Draggable too: with "Peek on hover" it covers the tab after 250 ms, so a drag that only
+ * worked on the tab had to start within that quarter second. */
+function Peek({ nav, drag }: { nav: Nav; drag: DragHandlers }) {
   const s = useStore();
   const r = s.running;
   const target = s.target(new Date());
   return (
-    <div className="peek" onClick={() => nav.set("day")}>
+    <div className="peek" onClick={() => nav.set("day")} {...drag}>
       <div className="grow" style={{ display: "flex", flexDirection: "column", gap: 4 }}>
         {r ? (
           <>

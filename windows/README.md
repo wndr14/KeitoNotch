@@ -9,8 +9,8 @@ Everything from the Mac app, except Apple Calendar (Windows uses Google Calendar
 
 | Mac | Windows |
 |---|---|
-| Edge notch: tab with ring → peek on hover → day view / entry form | ✅ left or right edge; drag the tab along the edge |
-| Island (five positions) | ✅ drag it; it snaps to the nearest spot. Bottom positions sit above the taskbar |
+| Edge notch: tab with ring → peek on hover → day view / entry form | ✅ left or right edge; drag the tab (or its peek card) along the edge |
+| Island (five positions) | ✅ drag the tab or its peek card; it snaps to the nearest spot. Bottom positions sit above the taskbar |
 | Menu bar style | **Tray only**: nothing on screen; the tray icon opens the day view next to the tray |
 | Display: main / built-in / external / all / active | Main, **Display with the pointer**, or a specific display (falls back to main when disconnected) |
 | Full-screen apps: notch tucks into the edge | ✅ rest the pointer at the edge to bring it back |
