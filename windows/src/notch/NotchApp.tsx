@@ -2,7 +2,15 @@
 // Styles: edge notch (left/right edge), island (floating pill, five positions) or tray only (nothing on screen
 // until you click the tray icon). Follows the chosen display, tucks away next to full-screen apps, and can be
 // dragged to a new spot.
-import { useCallback, useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type MouseEvent as ReactMouseEvent,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { store, useStore } from "../lib/store";
@@ -416,8 +424,23 @@ export function NotchApp() {
     },
   };
 
+  /** Pointer on the ring button (+ / stop): the card waits, otherwise it covers the button before you can click. */
+  const onRing = useRef(false);
+  const ringHover = {
+    onMouseEnter() {
+      onRing.current = true;
+      window.clearTimeout(hoverTimer.current);
+    },
+    onMouseLeave(e: ReactMouseEvent<HTMLElement>) {
+      onRing.current = false;
+      // Back on the rest of the tab: the card opens as usual. Off the notch altogether: nothing.
+      const root = e.currentTarget.closest(".notch");
+      if (root && e.relatedTarget instanceof Node && root.contains(e.relatedTarget)) onEnter();
+    },
+  };
+
   const onEnter = () => {
-    if (!s.prefs.expandOnHover || drag.current || style === "tray") return;
+    if (!s.prefs.expandOnHover || drag.current || style === "tray" || onRing.current) return;
     if (mode === "peek") {
       // Back while the card was shrinking: grow it again instead of collapsing.
       window.clearTimeout(shrinkTimer.current);
@@ -454,7 +477,7 @@ export function NotchApp() {
     >
       {morphing && (
         <div className={`morph-layer ${grown ? "faded" : ""}`} style={layer(tabSize)}>
-          <Tab nav={nav} island={style === "island"} drag={dragHandlers} quiet={s.prefs.expandOnHover} />
+          <Tab nav={nav} island={style === "island"} drag={dragHandlers} ring={ringHover} quiet={s.prefs.expandOnHover} />
         </div>
       )}
       {morphing && mode === "peek" && (
@@ -518,7 +541,13 @@ function RingButton({ size, onNewEntry, quiet = false }: { size: number; onNewEn
  * before a tooltip would; but Chromium takes the tooltip text when the pointer arrives and shows it ~1 s
  * later anyway, over the grown card (filmed twice). Removing the title once the card grows is too late.
  */
-function Tab({ nav, island, drag, quiet = false }: { nav: Nav; island: boolean; drag: DragHandlers; quiet?: boolean }) {
+function Tab({ nav, island, drag, ring, quiet = false }: {
+  nav: Nav;
+  island: boolean;
+  drag: DragHandlers;
+  ring: { onMouseEnter(): void; onMouseLeave(e: ReactMouseEvent<HTMLElement>): void };
+  quiet?: boolean;
+}) {
   const s = useStore();
   return (
     <div
@@ -533,7 +562,9 @@ function Tab({ nav, island, drag, quiet = false }: { nav: Nav; island: boolean; 
       }}
       {...drag}
     >
-      <RingButton size={island ? 26 : 34} onNewEntry={() => nav.openForm({ date: new Date() })} quiet={quiet} />
+      <span className="ring-hover" {...ring}>
+        <RingButton size={island ? 26 : 34} onNewEntry={() => nav.openForm({ date: new Date() })} quiet={quiet} />
+      </span>
       <span className="time num">
         {s.running ? fmt.timer(s.elapsed, s.prefs.showSeconds) : <span className="muted">–</span>}
       </span>

@@ -193,6 +193,8 @@ input, textarea, select { font: inherit; color: inherit; user-select: text; }
 .fav-row + .fav-row { border-top: 1px solid var(--line); }
 .fav-row input { flex: 1; height: 30px; padding: 0 8px; border-radius: 5px; border: 1px solid var(--line); background: var(--raise); outline: none; }
 
+/* Wrapper that keeps the peek card closed while the pointer is on the + / stop button. */
+.ring-hover { display: flex; flex: none; }
 .ring-btn {
   position: relative;
   border: none;
