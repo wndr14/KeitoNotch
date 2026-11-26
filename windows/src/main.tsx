@@ -8,6 +8,8 @@ import { loadPrefs, TEXT_SCALE } from "./lib/prefs";
 import { NotchApp } from "./notch/NotchApp";
 import { ToastApp } from "./toast/ToastApp";
 import { SettingsApp } from "./settings/SettingsApp";
+import { Recover } from "./Recover";
+import { installProblemLog } from "./lib/problems";
 
 const params = new URLSearchParams(location.search);
 const view = params.get("view") ?? "notch";
@@ -34,8 +36,12 @@ document.body.classList.add(view === "settings" ? "window" : "transparent");
 // No browser context menu (right-click "Reload", "Inspect") in the notch and toast.
 if (view !== "settings") document.addEventListener("contextmenu", (e) => e.preventDefault());
 
+installProblemLog(view);
+
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    {view === "toast" ? <ToastApp /> : view === "settings" ? <SettingsApp initialSection={params.get("section") ?? "keito"} /> : <NotchApp />}
+    <Recover>
+      {view === "toast" ? <ToastApp /> : view === "settings" ? <SettingsApp initialSection={params.get("section") ?? "keito"} /> : <NotchApp />}
+    </Recover>
   </StrictMode>,
 );

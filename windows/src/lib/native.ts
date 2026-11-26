@@ -59,4 +59,6 @@ export const native = {
   quit: () => invoke<void>("quit"),
   oauthListen: () => invoke<number>("oauth_listen"),
   oauthWait: (timeoutSecs: number) => invoke<Record<string, string>>("oauth_wait", { timeoutSecs }),
+  /** One line in %LOCALAPPDATA%\ai.keito.notch\logs\problems.log. */
+  logProblem: (line: string) => invoke<void>("log_problem", { line }),
 };

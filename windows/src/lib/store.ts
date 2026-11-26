@@ -315,8 +315,12 @@ export class AppStore {
 
   // MARK: Lifecycle
 
+  private undoListener: Promise<unknown> | null = null;
+
+  /** Safe to call again (the notch restarts its UI after a crash): one Undo listener, a fresh load. */
   async start() {
-    await listen<number>("toast-undo", (ev) => void this.runUndo(ev.payload));
+    this.undoListener ??= listen<number>("toast-undo", (ev) => void this.runUndo(ev.payload));
+    await this.undoListener;
     await this.reload();
   }
 

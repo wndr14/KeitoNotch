@@ -59,6 +59,64 @@ fn secret_set(key: String, value: Option<String>) -> Result<(), String> {
     }
 }
 
+// MARK: Problem log
+
+/// Keeps the log small: past this size the old half is dropped.
+const PROBLEM_LOG_MAX: u64 = 256 * 1024;
+
+/// Appends one line to `%LOCALAPPDATA%\ai.keito.notch\logs\problems.log`: UI crashes and unhandled errors,
+/// so a notch that "just disappeared" leaves a trace you can read without a debugger.
+/// Async: file I/O stays off the main thread that draws the windows.
+#[tauri::command]
+async fn log_problem(app: AppHandle, line: String) -> Result<(), String> {
+    use std::io::Write;
+    let dir = app.path().app_log_dir().map_err(|e| e.to_string())?;
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let path = dir.join("problems.log");
+    if std::fs::metadata(&path).map(|m| m.len() > PROBLEM_LOG_MAX).unwrap_or(false) {
+        let old = std::fs::read_to_string(&path).unwrap_or_default();
+        std::fs::write(&path, trim_log(&old)).map_err(|e| e.to_string())?;
+    }
+    let mut f = std::fs::OpenOptions::new().create(true).append(true).open(&path).map_err(|e| e.to_string())?;
+    writeln!(f, "{}", one_line(&line)).map_err(|e| e.to_string())
+}
+
+/// One log entry per line, at most 8000 characters.
+fn one_line(s: &str) -> String {
+    s.replace(['\r', '\n'], " | ").chars().take(8000).collect()
+}
+
+/// The newer half of the log, starting at a whole line.
+fn trim_log(old: &str) -> &str {
+    let mut half = old.len() / 2;
+    while !old.is_char_boundary(half) {
+        half += 1;
+    }
+    match old[half..].find('\n') {
+        Some(i) => &old[half + i + 1..],
+        None => "",
+    }
+}
+
+#[cfg(test)]
+mod log_tests {
+    use super::{one_line, trim_log};
+
+    #[test]
+    fn trims_to_whole_lines_even_inside_multibyte_text() {
+        let old = "één\ntwee ⏎ drie\nvier\n";
+        let t = trim_log(old);
+        assert!(old.ends_with(t));
+        assert!(t.is_empty() || old[..old.len() - t.len()].ends_with('\n'));
+    }
+
+    #[test]
+    fn one_entry_per_line() {
+        assert_eq!(one_line("a\r\nb\nc"), "a |  | b | c");
+        assert_eq!(one_line(&"x".repeat(9000)).len(), 8000);
+    }
+}
+
 // MARK: Windows
 
 /// Shows the notch without taking focus away from what you're doing.
@@ -233,6 +291,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             secret_get,
             secret_set,
+            log_problem,
             placement::place_notch,
             placement::monitors,
             placement::screen_state,
