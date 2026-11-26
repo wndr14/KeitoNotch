@@ -42,6 +42,48 @@ pub fn show_without_focus(win: &WebviewWindow) {
     let _ = win.show();
 }
 
+/// Puts an always-on-top window back in the topmost band when Windows has left it below an ordinary window.
+/// Measured 26-11 on the work laptop: the notch still had WS_EX_TOPMOST but sat at place 55 in the z-order,
+/// under a maximised Windows Terminal and Chrome, so the tab was invisible and clicks on it went to the
+/// terminal. One SetWindowPos(HWND_TOPMOST) brought it back. Returns true when it had to; cheap otherwise
+/// (only the few topmost windows above it are visited).
+#[cfg(windows)]
+pub fn keep_on_top(win: &WebviewWindow) -> bool {
+    use windows_sys::Win32::UI::WindowsAndMessaging::{
+        GetWindow, GetWindowLongW, IsWindowVisible, SetWindowPos, GWL_EXSTYLE, GW_HWNDPREV, HWND_TOPMOST, SWP_NOACTIVATE,
+        SWP_NOMOVE, SWP_NOSIZE, WS_EX_TOPMOST,
+    };
+    let Ok(hwnd) = win.hwnd() else { return false };
+    let hwnd = hwnd.0 as _;
+    // SAFETY: plain z-order queries and one SetWindowPos on a live window owned by this process.
+    unsafe {
+        if IsWindowVisible(hwnd) == 0 {
+            return false;
+        }
+        let mut above = GetWindow(hwnd, GW_HWNDPREV);
+        let mut buried = false;
+        for _ in 0..2000 {
+            if above.is_null() {
+                break;
+            }
+            if IsWindowVisible(above) != 0 && (GetWindowLongW(above, GWL_EXSTYLE) as u32 & WS_EX_TOPMOST) == 0 {
+                buried = true;
+                break;
+            }
+            above = GetWindow(above, GW_HWNDPREV);
+        }
+        if buried {
+            SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+        }
+        buried
+    }
+}
+
+#[cfg(not(windows))]
+pub fn keep_on_top(_win: &WebviewWindow) -> bool {
+    false
+}
+
 /// Moves and resizes a window in ONE step (physical pixels). Separate set_size + set_position calls let
 /// Windows draw the frame in between: measured on hover, the island grew 228 px off-screen at its old
 /// spot for ~4 ms before moving, and shrank at the wrong spot on leave — a visible jump.

@@ -124,6 +124,7 @@ mod log_tests {
 fn show_notch(app: AppHandle) -> Result<(), String> {
     let win = app.get_webview_window("notch").ok_or("no notch window")?;
     platform::show_without_focus(&win);
+    platform::keep_on_top(&win);
     Ok(())
 }
 

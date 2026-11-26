@@ -14,6 +14,7 @@ import { dayKey } from "../lib/dates";
 import * as fmt from "../lib/duration";
 import type { CalendarEvent, TimeEntry } from "../lib/models";
 import { keyFromLink, looksLikeKey } from "../lib/jira";
+import { reportProblem } from "../lib/problems";
 import { DayRing, ClientTask, ProjectDot, Spinner, TicketChip } from "./parts";
 import { Play, Plus, Stop } from "../icons";
 import { DayView } from "./DayView";
@@ -301,10 +302,13 @@ export function NotchApp() {
   useEffect(() => {
     let edgeHits = 0;
     let revealedAt = 0;
+    let reTopLogged = 0;
     const timer = window.setInterval(async () => {
       const p = store.prefs;
       if (p.style === "tray") return;
       const st = await native.screenState(p.style, p.edge, p.island).catch(() => null);
+      // Rare and invisible otherwise: note the first few, so the log shows how often Windows buries the notch.
+      if (st?.reTopped && reTopLogged++ < 5) reportProblem("notch was below other windows; put back on top", "z-order");
       if (!st || drag.current?.active) return;
       const m = modeRef.current;
       if (p.display === "active" && m === "collapsed" && st.pointerMonitor && st.pointerMonitor !== currentMonitor.current) {

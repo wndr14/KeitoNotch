@@ -32,6 +32,8 @@ export interface ScreenState {
   fullscreen: boolean;
   atEdge: boolean;
   overNotch: boolean;
+  /** The notch had sunk below an ordinary window and was put back on top. */
+  reTopped: boolean;
   fx: number;
   fy: number;
 }

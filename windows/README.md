@@ -46,6 +46,10 @@ Each window sits in an error boundary (`src/Recover.tsx`): a crash restarts that
 returns to its tab) instead of leaving an empty, invisible window. Crashes and unhandled errors are written to
 `%LOCALAPPDATA%\ai.keito.notch\logs\problems.log` (error, stack and component stack; no Keito or Jira data).
 
+Windows sometimes leaves the always-on-top notch *below* ordinary windows (it keeps `WS_EX_TOPMOST` but sits
+under e.g. a maximised terminal, so the tab is invisible and can't be clicked). `platform::keep_on_top` checks
+this twice a second and on every show, and puts it back; the first few times per run are logged.
+
 ## Layout
 
 ```

@@ -73,6 +73,8 @@ pub struct ScreenState {
     pub at_edge: bool,
     /// Pointer inside the notch's rectangle.
     pub over_notch: bool,
+    /// The notch had sunk below an ordinary window and was put back on top (see platform::keep_on_top).
+    pub re_topped: bool,
     /// Pointer position as a fraction of the notch monitor's work area (for dragging), clamped to 0…1.
     pub fx: f64,
     pub fy: f64,
@@ -212,7 +214,10 @@ pub fn screen_state(app: AppHandle, state: tauri::State<'_, PlacementState>, sty
         };
     let w = p.work;
     let frac = |v: f64, o: i32, len: i32| if len > 0 { ((v - o as f64) / len as f64).clamp(0.0, 1.0) } else { 0.5 };
+    // Twice a second anyway: also the moment to notice the notch sank behind other windows.
+    let re_topped = app.get_webview_window("notch").map(|w| platform::keep_on_top(&w)).unwrap_or(false);
     Ok(ScreenState {
+        re_topped,
         pointer_monitor: pointer,
         notch_monitor: p.monitor.clone(),
         fullscreen: platform::fullscreen_app_on(s),
